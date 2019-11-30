@@ -1,0 +1,425 @@
+---
+title: 'Goals scored in a soccer match: fitting distributions (Ver 2)'
+author: "Magdiel Ablan"
+date: "07/02/2019"
+output:
+  html_document: 
+    fig_caption: yes
+    toc: yes
+  pdf_document: default
+---
+
+## Introduction
+
+This is part 1 of the project about goals scored in a football/soccer match. 
+The objetive is to analyze the fit of 3 different distributions against observed 
+data. The data are:
+
+* Home Goals 
+* Away Goals 
+* Total Goals
+
+For each of these variables 3 distributions will be fit:
+
+* Poisson  
+* Negative Binomial
+* Zero-inflated Poisson
+
+
+## Data preparation
+
+First, we need to load all the required libraries:
+
+```{r setup, echo=TRUE, message=FALSE}
+# To read xlsx files:
+library(readxl)
+
+# To fit ditributions:
+library(fitdistrplus)
+
+# Add to R zip related distributions
+library(VGAM)
+
+# Legend for the plots
+plot.legend <- c("Poisson", "Negative binomial","ZIP")
+plot.legend2 <- c("Poisson", "Negative binomial")
+
+# To print nicer tables
+library(kableExtra)
+
+# To know how to print tables 
+outputFormat = knitr::opts_knit$get("rmarkdown.pandoc.to")
+
+```
+
+We now read the data. The `raw.xlsx` file contains only the columns of data 
+corresponding at the goal variables. 
+
+```{r}
+raw <- read_excel("data/raw.xlsx")
+head(raw)
+summary(raw)
+n <- length(raw$HG)
+```
+
+There are a total of `r n ` soccer games in the file. Summary stats look as
+expected. 
+
+## Home goals (HG)
+
+`HG.sum` is table that summarises the number of home goals from all the matches
+```{r}
+HG.sum <-table(raw$HG)
+HG.sum
+HG.goals <-as.numeric(names(HG.sum))
+
+
+```
+
+The density and CDF distribution are:
+
+```{r}
+plotdist(raw$HG, histo = TRUE, discrete=TRUE)
+```
+
+We now fit the poisson distribution to this data. The only parameter of the
+poisson is the mean, lambda:
+
+```{r}
+HG.pois <- fitdist(raw$HG,"pois")
+HG.pois
+```
+
+Likewise, we fit the negative binomial, using the alternative parametrization
+with size (target for number of successful trials) and mean (mu):
+
+```{r}
+HG.nbinom <- fitdist(raw$HG,"nbinom")
+HG.nbinom
+```
+
+Finally, we fit the ZIP distribution using the functions provided in the `countreg`
+package. Since this is not one of the starndard distributions provided in the
+`fitdistrplus` package, we need to provide starting values for their parameters
+$\pi$ and $\lambda$. These are momentum estimators based on the mean and variance
+of the data
+
+```{r}
+m <- mean(raw$HG)
+s <- var(raw$HG)
+lambdaI <- (s + m^2)/m - 1
+lambdaI
+piI <- (s-m)/(s+m^2-m)
+piI
+
+```
+
+Provided with these initial values we continue with the `fitdistr`function as
+before:
+
+```{r}
+HG.zip <-fitdist(raw$HG,"zipois",start=list(lambda=lambdaI,pstr0=piI))
+HG.zip
+
+```
+
+The maximum likelihood estimators returned by the `fitdistr` are very similar
+to the previous ones. Also, as seen shortly, provide a good fit of the data so
+we can safely ignore the warning.
+
+
+We now compare graphically the fit of these three distributions:
+
+```{r}
+par(mfrow=c(2,2))
+denscomp(list(HG.pois, HG.nbinom, HG.zip), fittype = "o" ,legendtext = plot.legend,main="HG: Histogram
+         and theoretical densities")
+cdfcomp(list(HG.pois, HG.nbinom,HG.zip), legendtext = plot.legend,main="HG: Empirical
+         and theoretical CDFs") 
+ppcomp(list(HG.pois, HG.nbinom,HG.zip), legendtext = plot.legend,main="HG: P-P plot")
+qqcomp(list(HG.pois, HG.nbinom,HG.zip), legendtext = plot.legend,main="HG: Q-Q plot")
+```
+
+All the distribution seem very close to the data. However, a zoom in the first 
+graph shows an improvement with the ZIP adjusted model specially for the values
+of zero and one:
+
+```{r}
+denscomp(list(HG.pois, HG.nbinom,HG.zip), fittype = "o" ,legendtext = plot.legend,main="HG: Histogram
+         and theoretical densities")
+
+```
+
+More formally, we can run goodness of fit statistics to evaluate which one has
+the best fit:
+
+```{r}
+gofstat(list(HG.pois, HG.nbinom,HG.zip),fitnames=c("Poisson","Negative binomial","ZIP"))
+```
+
+These results suggest that both the negative binomial and the ZIP distribution
+are good models for the data. 
+
+We now repeat this analysis for the two other variables in the data set, away team
+goals and total goals.
+
+
+## Away goals (AG)
+
+`AG.sum` is table that summarises the number of away goals from all the matches
+```{r}
+AG.sum <-table(raw$AG)
+AG.sum
+AG.goals <-as.numeric(names(AG.sum))
+
+```
+
+The density and CDF distribution are:
+
+```{r}
+plotdist(raw$AG, histo = TRUE, discrete=TRUE)
+```
+
+We now fit the poisson distribution to this data. The only parameter of the
+poisson is the mean, lambda:
+
+```{r}
+AG.pois <- fitdist(raw$AG,"pois")
+AG.pois
+```
+
+Likewise, we fit the negative binomial, using the alternative parametrization
+with size (target for number of successful trials) and mean (mu):
+
+```{r}
+AG.nbinom <- fitdist(raw$AG,"nbinom")
+AG.nbinom
+```
+
+Finally, we fit the ZIP distribution. But before, we need to calculate initial 
+values for the parameters:
+
+```{r}
+m <- mean(raw$AG)
+s <- var(raw$AG)
+lambdaI <- (s + m^2)/m - 1
+lambdaI
+piI <- (s-m)/(s+m^2-m)
+piI
+
+```
+```{r}
+AG.zip <-fitdist(raw$AG,"zipois",start=list(lambda=lambdaI,pstr0=piI))
+AG.zip
+
+```
+
+As before, only a slight modification with respect to previous values. We can 
+safely ignore the warnings produced. 
+
+We now compare graphically the fit of these distributions:
+
+```{r}
+par(mfrow=c(2,2))
+denscomp(list(AG.pois, AG.nbinom,AG.zip), fittype = "o" ,legendtext = plot.legend,main="AG: Histogram
+         and theoretical densities")
+cdfcomp(list(AG.pois, AG.nbinom,AG.zip), legendtext = plot.legend,main="AG: Empirical
+         and theoretical CDFs") 
+ppcomp(list(AG.pois, AG.nbinom,AG.zip), legendtext = plot.legend,main="AG: P-P plot")
+qqcomp(list(AG.pois, AG.nbinom,AG.zip), legendtext = plot.legend,main="AG: Q-Q plot")
+
+```
+
+Let's zoom in the first graph to see better:
+
+```{r}
+denscomp(list(AG.pois, AG.nbinom,AG.zip), fittype = "o" ,legendtext = plot.legend,main="AG: Histogram
+         and theoretical densities")
+
+```
+
+More formally, we can run goodness of fit statistics to evaluate which one has
+the best fit:
+
+```{r}
+gofstat(list(AG.pois, AG.nbinom,AG.zip),fitnames=c("Poisson","Negative binomial","ZIP"))
+```
+
+This time the ZIP distribution seem to be the best model for the data. 
+
+## Total goals (TOT)
+
+`TOT.sum` is table that summarises the number of away goals from all the matches
+```{r}
+TOT.sum <-table(raw$TOT)
+TOT.sum
+TOT.goals <-as.numeric(names(TOT.sum))
+
+```
+
+The density and CDF distribution are:
+
+```{r}
+plotdist(raw$TOT, histo = TRUE, discrete=TRUE)
+```
+
+We now fit the poisson distribution to this data. The only parameter of the
+poisson is the mean, lambda:
+
+```{r}
+TOT.pois <- fitdist(raw$TOT,"pois")
+TOT.pois
+```
+
+Likewise, we fit the negative binomial, using the alternative parametrization
+with size (target for number of successful trials) and mean (mu):
+
+```{r}
+TOT.nbinom <- fitdist(raw$TOT,"nbinom")
+TOT.nbinom
+```
+
+The size parameter is very large, specially as compared to the values obtained
+for the home and away goal distribution. 
+
+The density plot for total goals does not suggest that the ZIP distribution can
+be a good model for this data. In fact, when we try to find initial values for
+the parameters this is what we get:
+```{r}
+m <- mean(raw$TOT)
+s <- var(raw$TOT)
+lambdaI <- (s + m^2)/m - 1
+lambdaI
+piI <- (s-m)/(s+m^2-m)
+piI
+
+
+```
+
+$\pi$ cannot be a negative number. Therefore, for the total goal distribution 
+we only fit Poisson and negative binomial models.
+
+We now compare graphically the fit of these two distributions:
+
+```{r}
+par(mfrow=c(2,2))
+denscomp(list(TOT.pois, TOT.nbinom), fittype = "o" ,legendtext = plot.legend2,main="TOT: Histogram
+         and theoretical densities")
+cdfcomp(list(TOT.pois, TOT.nbinom), legendtext = plot.legend2,main="TOT: Empirical
+         and theoretical CDFs") 
+ppcomp(list(TOT.pois, TOT.nbinom), legendtext = plot.legend2,main="TOT: P-P plot")
+qqcomp(list(TOT.pois, TOT.nbinom), legendtext = plot.legend2,main="TOT: Q-Q plot")
+
+```
+
+Let's zoom in the first graph to see better:
+
+```{r}
+denscomp(list(TOT.pois, TOT.nbinom), fittype = "o" ,legendtext = plot.legend2,main="TOT: Histogram
+         and theoretical densities")
+
+```
+
+More formally, we can run goodness of fit statistics to evaluate which one has
+the best fit:
+
+```{r}
+gofstat(list(TOT.pois, TOT.nbinom),fitnames=c("Poisson","Negative binomial"))
+```
+
+This shows an almost technical tie between the two. Based on the 
+chi-square test, the distribution of best fit would be the negative binomial.
+However, the rather large size value might be an indication that perhaps the
+Poisson distribution is a better model for this variable.
+
+## Expected goals for the Poisson distribution
+
+This is the table for expected goals for the Poisson distribution using the data
+on `r n` games and the parameters estimated in the previous sections.
+
+```{r}
+max.goals <- max(HG.goals,AG.goals,TOT.goals)
+
+# pois.dist has the expected goal count for poisson
+pois.dist <- data.frame(goals=0:max.goals,HG=numeric(max.goals+1), 
+                        AG=numeric(max.goals+1),TOT = numeric(max.goals+1))
+
+for (i in 0:(max.goals)) {
+  j <- i+1
+ pois.dist$HG[j] <- dpois(pois.dist$goals[j],HG.pois$estimate["lambda"])*n
+ pois.dist$AG[j] <- dpois(pois.dist$goals[j],AG.pois$estimate["lambda"])*n
+ pois.dist$TOT[j] <- dpois(pois.dist$goals[j],TOT.pois$estimate["lambda"])*n
+}
+
+pois.dist
+```
+
+## Expected goals for the negative binomial distribution
+
+This is the table for expected goals for the negative binomial distribution using 
+the data on `r n` games and the parameters estimated in the previous sections.
+
+```{r}
+nbinom.dist <- data.frame(goals=0:max.goals,HG=numeric(max.goals+1), 
+                        AG=numeric(max.goals+1),TOT = numeric(max.goals+1))
+
+for (i in 0:max.goals) {
+  j <- i+1
+  nbinom.dist$HG[j] <- dnbinom(nbinom.dist$goals[j],size = HG.nbinom$estimate["size"],
+                               mu=HG.nbinom$estimate["mu"])*n
+  nbinom.dist$AG[j] <- dnbinom(nbinom.dist$goals[j],size = AG.nbinom$estimate["size"],
+                               mu=AG.nbinom$estimate["mu"])*n
+  nbinom.dist$TOT[j] <- dnbinom(nbinom.dist$goals[j],size = TOT.nbinom$estimate["size"],
+                                mu=TOT.nbinom$estimate["mu"])*n
+}
+
+nbinom.dist
+```
+
+
+## Expected goals for the ZIP distribution
+
+This is the table for expected goals for the ZIP distribution using the data
+on `r n` games and the parameters estimated in the previous sections.
+
+
+```{r}
+zip.dist <- data.frame(goals=0:max.goals,HG=numeric(max.goals+1), 
+                        AG=numeric(max.goals+1))
+
+for (i in 0:max.goals) {
+  j <- i+1
+  zip.dist$HG[j] <- dzipois(zip.dist$goals[j],lambda = HG.zip$estimate["lambda"],
+                               pstr0=HG.zip$estimate["pstr0"])*n
+  zip.dist$AG[j] <- dzipois(zip.dist$goals[j],lambda = AG.zip$estimate["lambda"],
+                               pstr0=AG.zip$estimate["pstr0"])*n
+  
+}
+
+zip.dist
+
+
+```
+
+## By way of conclusion
+
+The following table summarizes the fit of the given models:
+
+```{r}
+
+lambdas<-round(c(HG.pois$estimate["lambda"],AG.pois$estimate["lambda"],TOT.pois$estimate["lambda"]),2)
+mus <- round(c(HG.nbinom$estimate["mu"],AG.nbinom$estimate["mu"],TOT.nbinom$estimate["mu"]),2)
+sizes <-round(c(HG.nbinom$estimate["size"],AG.nbinom$estimate["size"],TOT.nbinom$estimate["size"]),2)
+pis <- round(c(HG.zip$estimate["pstr0"],AG.zip$estimate["pstr0"],NA),2)
+Zlambdas<-round(c(HG.zip$estimate["lambda"],AG.zip$estimate["lambda"],NA),2)
+best<-c("Negative binomial or ZIP","ZIP","Poisson")
+sum.tab <- data.frame(lambda=lambdas,mu=mus,size=sizes,pi=pis,zlambda=Zlambdas,best=best)
+row.names(sum.tab)<-c("Home","Away","Total")
+kable(sum.tab,col.names=c("$\\lambda$", "$\\mu$", "n", "$\\pi$","$\\lambda$","Best model"),
+      booktabs=T,escape=T)  %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Poisson" = 1, "Negative binomial" = 2, "ZIP" = 2," "=1),align="c")
+```
+
+
+
